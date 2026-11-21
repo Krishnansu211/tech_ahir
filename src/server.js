@@ -169,7 +169,7 @@ app.get('/auctions/:id/stream', (req, res) => {
  * Background ticker: runs every 500ms to monitor auction expirations
  * and broadcast winner/closing event.
  */
-setInterval(() => {
+const ticker = setInterval(() => {
   const now = Date.now();
   for (const auction of store.getAll()) {
     if (auction.status === 'open' && now >= auction.endTime) {
@@ -189,6 +189,7 @@ setInterval(() => {
     }
   }
 }, 500);
+ticker.unref();
 
 // Seed initial demo auction "a1"
 function seedInitialAuction() {
