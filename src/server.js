@@ -61,6 +61,36 @@ app.get('/auctions', (req, res) => {
 });
 
 /**
+ * POST /auctions/:id/reset
+ * Resets an auction for interactive testing with a fresh duration
+ */
+app.post('/auctions/:id/reset', (req, res) => {
+  const id = req.params.id;
+  const existing = store.get(id);
+  const duration = req.body.duration || 180; // 3 minutes
+  const item = req.body.item || (existing ? existing.item : 'VIP Cricket Match Ticket - Grand Finale');
+  const startPrice = req.body.startPrice || 5000;
+
+  const fresh = createAuction({
+    id,
+    item,
+    startPrice,
+    durationSeconds: duration
+  });
+
+  store.set(id, fresh);
+
+  // Broadcast state to all connected watchers
+  sseManager.broadcast(id, 'INIT_STATE', {
+    ...fresh,
+    serverTime: Date.now(),
+    watchers: sseManager.getWatcherCount(id)
+  });
+
+  return res.json({ success: true, auction: { ...fresh, serverTime: Date.now() } });
+});
+
+/**
  * GET /auctions/:id
  * Fetches current state of an auction including authoritative server time
  */

@@ -420,6 +420,7 @@
         <span class="brand-badge">SINGLE WRITER ENGINE</span>
       </div>
       <div class="header-stats">
+        <button id="resetBtn" onclick="resetDemoAuction()" style="background: rgba(88, 166, 255, 0.15); border: 1px solid rgba(88, 166, 255, 0.4); color: var(--info); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer;">🔄 Restart Auction (3m)</button>
         <span class="live-indicator"><span class="live-dot"></span> <span id="statusText">CONNECTING...</span></span>
         <span>👥 Watchers: <b id="watcherCount">1</b></span>
       </div>
@@ -760,6 +761,28 @@
         submitBidBtn.disabled = isClosed;
       }
     });
+
+    // Reset demo auction function
+    async function resetDemoAuction() {
+      try {
+        const res = await fetch(`/auctions/${AUCTION_ID}/reset`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ duration: 180, startPrice: 5000 })
+        });
+        const data = await res.json();
+        if (data.success) {
+          isClosed = false;
+          submitBidBtn.disabled = false;
+          submitBidBtn.textContent = 'Place Live Bid';
+          winnerCardEl.style.display = 'none';
+          updateState(data.auction);
+          showFeedback('Demo auction restarted with fresh 3-minute timer!', true);
+        }
+      } catch (err) {
+        showFeedback('Failed to restart auction');
+      }
+    }
 
     // Initial connection
     connectSSE();
