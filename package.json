@@ -1,0 +1,14 @@
+{
+  "name": "tech_ahir",
+  "version": "1.0.0",
+  "description": "Real-time Live Auction Platform with Anti-Sniping and Concurrency Protection",
+  "main": "src/server.js",
+  "scripts": {
+    "start": "node src/server.js",
+    "test": "node tests/concurrency.js",
+    "test:unit": "node tests/auction.test.js"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
