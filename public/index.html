@@ -452,14 +452,38 @@
 
     <!-- Writer / Auctioneer Management Console -->
     <div id="writerPanel" class="card" style="display: none; border-color: #d29922; background: rgba(210, 153, 34, 0.08); padding: 16px;">
-      <h3 style="color: #d29922; margin-bottom: 10px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+      <h3 style="color: #d29922; margin-bottom: 12px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
         <span>👑 <b>Writer / Auctioneer Control Panel</b> (Exclusive to Writer Role)</span>
-        <span style="font-size: 0.75rem; color: #d29922;">Can create, reset & close auctions</span>
+        <span style="font-size: 0.75rem; color: #d29922;">Full Auction Lifecycle Management</span>
       </h3>
-      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+      <div style="display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 12px;">
+        <button class="quick-btn" onclick="toggleCreateAuctionForm()" style="color: #3fb950; border-color: #3fb950; font-weight: bold;">➕ Create New Auction Item</button>
         <button class="quick-btn" onclick="resetDemoAuction()" style="color: #58a6ff; border-color: #58a6ff;">🔄 Reset Lot with 3m Timer</button>
         <button class="quick-btn" onclick="forceCloseAuction()" style="color: #f85149; border-color: #f85149;">🛑 Force Close Auction</button>
       </div>
+
+      <!-- Create New Auction Form -->
+      <form id="createAuctionForm" onsubmit="submitNewAuction(event)" style="display: none; background: rgba(13, 17, 23, 0.85); border: 1px solid var(--border); padding: 14px; border-radius: 8px; margin-top: 10px;">
+        <h4 style="color: #fff; font-size: 0.9rem; margin-bottom: 10px;">Create & Broadcast New Auction</h4>
+        <div style="display: grid; grid-template-columns: 2fr 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+          <div>
+            <label class="form-label" style="font-size: 0.75rem;">Item Title</label>
+            <input type="text" id="newItemTitle" class="input-field" placeholder="e.g. Virat Kohli Signed Bat" required style="padding: 8px 10px;" />
+          </div>
+          <div>
+            <label class="form-label" style="font-size: 0.75rem;">Start Price (₹)</label>
+            <input type="number" id="newItemPrice" class="input-field" placeholder="5000" min="100" step="100" required style="padding: 8px 10px;" />
+          </div>
+          <div>
+            <label class="form-label" style="font-size: 0.75rem;">Duration (Sec)</label>
+            <input type="number" id="newItemDuration" class="input-field" placeholder="180" min="30" value="180" required style="padding: 8px 10px;" />
+          </div>
+        </div>
+        <div style="display: flex; gap: 8px; justify-content: flex-end;">
+          <button type="button" class="quick-btn" onclick="toggleCreateAuctionForm()">Cancel</button>
+          <button type="submit" class="quick-btn" style="background: var(--accent); color: #fff; border: none; padding: 6px 14px;">🚀 Publish Auction Now</button>
+        </div>
+      </form>
     </div>
 
     <!-- Anti-sniping notification -->
@@ -540,7 +564,7 @@
   </div>
 
   <script>
-    const AUCTION_ID = 'a1';
+    let currentAuctionId = 'a1';
     let currentPrice = 0;
     let endTime = 0;
     let serverTimeSkew = 0; // serverTime - localTime
@@ -708,7 +732,7 @@
     function connectSSE() {
       if (eventSource) eventSource.close();
 
-      eventSource = new EventSource(`/auctions/${AUCTION_ID}/stream`);
+      eventSource = new EventSource(`/auctions/${currentAuctionId}/stream`);
 
       eventSource.addEventListener('open', () => {
         statusTextEl.textContent = 'LIVE SSE CONNECTED';
@@ -781,7 +805,7 @@
         const headers = { 'Content-Type': 'application/json' };
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-        const res = await fetch(`/auctions/${AUCTION_ID}/bids`, {
+        const res = await fetch(`/auctions/${currentAuctionId}/bids`, {
           method: 'POST',
           headers: headers,
           body: JSON.stringify({ bidder, amount })
@@ -807,7 +831,7 @@
         const headers = { 'Content-Type': 'application/json' };
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-        const res = await fetch(`/auctions/${AUCTION_ID}/reset`, {
+        const res = await fetch(`/auctions/${currentAuctionId}/reset`, {
           method: 'POST',
           headers: headers,
           body: JSON.stringify({ duration: 180, startPrice: 5000 })
@@ -834,7 +858,7 @@
         const headers = { 'Content-Type': 'application/json' };
         if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
 
-        const res = await fetch(`/auctions/${AUCTION_ID}/close`, {
+        const res = await fetch(`/auctions/${currentAuctionId}/close`, {
           method: 'POST',
           headers: headers
         });
@@ -846,6 +870,61 @@
         }
       } catch (err) {
         showFeedback('Network error closing auction');
+      }
+    }
+
+    // Toggle Create Auction Form in Writer Panel
+    function toggleCreateAuctionForm() {
+      const form = document.getElementById('createAuctionForm');
+      form.style.display = form.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // Writer submits new auction
+    async function submitNewAuction(e) {
+      e.preventDefault();
+      if (!authToken || !currentUser || currentUser.role !== 'writer') {
+        showFeedback('Only authenticated Writers can create new auctions');
+        return;
+      }
+
+      const title = document.getElementById('newItemTitle').value.trim();
+      const price = Number(document.getElementById('newItemPrice').value);
+      const duration = Number(document.getElementById('newItemDuration').value);
+      const newId = 'lot_' + Date.now();
+
+      try {
+        const res = await fetch('/auctions', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${authToken}`
+          },
+          body: JSON.stringify({
+            id: newId,
+            item: title,
+            startPrice: price,
+            duration: duration
+          })
+        });
+
+        const data = await res.json();
+        if (res.ok && data.success) {
+          showFeedback(`🎉 Lot "${title}" created and published live!`, true);
+          toggleCreateAuctionForm();
+          document.getElementById('newItemTitle').value = '';
+
+          // Seamlessly transition dashboard to the new auction
+          currentAuctionId = newId;
+          document.getElementById('auctionTag').textContent = 'LOT: ' + newId;
+          isClosed = false;
+          winnerCardEl.style.display = 'none';
+          feedListEl.innerHTML = '<li style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px;">Awaiting first bid...</li>';
+          connectSSE();
+        } else {
+          showFeedback(data.error || data.message || 'Failed to create auction');
+        }
+      } catch (err) {
+        showFeedback('Network error creating auction');
       }
     }
 
