@@ -1,0 +1,768 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Auction Platform | Cricket VIP Tickets</title>
+  <style>
+    :root {
+      --bg: #0d1117;
+      --card-bg: #161b22;
+      --border: #30363d;
+      --text-main: #f0f6fc;
+      --text-muted: #8b949e;
+      --accent: #238636;
+      --accent-hover: #2ea043;
+      --warning: #f0883e;
+      --danger: #f85149;
+      --info: #58a6ff;
+      --gold: #d29922;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    }
+
+    body {
+      background-color: var(--bg);
+      color: var(--text-main);
+      padding: 24px 16px;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 900px;
+      display: flex;
+      flex-direction: column;
+      gap: 20px;
+    }
+
+    header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      border-bottom: 1px solid var(--border);
+      padding-bottom: 16px;
+    }
+
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .brand h1 {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+    }
+
+    .brand-badge {
+      background: rgba(35, 134, 54, 0.2);
+      color: #3fb950;
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      padding: 2px 8px;
+      border-radius: 12px;
+      font-size: 0.75rem;
+      font-weight: 600;
+    }
+
+    .header-stats {
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+    }
+
+    .live-indicator {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      color: #3fb950;
+      font-weight: 600;
+    }
+
+    .live-dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background-color: #3fb950;
+      animation: pulse 1.5s infinite;
+    }
+
+    @keyframes pulse {
+      0% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.4; transform: scale(1.2); }
+      100% { opacity: 1; transform: scale(1); }
+    }
+
+    /* Anti-sniping notification banner */
+    .sniping-alert {
+      display: none;
+      background: linear-gradient(90deg, #9e6a03, #d29922);
+      color: #000;
+      font-weight: 700;
+      padding: 12px 18px;
+      border-radius: 8px;
+      animation: flashBanner 0.5s ease-in-out;
+    }
+
+    @keyframes flashBanner {
+      0% { transform: scale(0.98); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
+    /* Grid Layout */
+    .main-grid {
+      display: grid;
+      grid-template-columns: 1.2fr 0.8fr;
+      gap: 20px;
+    }
+
+    @media (max-width: 768px) {
+      .main-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .card {
+      background-color: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+    }
+
+    .item-header {
+      margin-bottom: 20px;
+    }
+
+    .item-tag {
+      font-size: 0.8rem;
+      color: var(--info);
+      text-transform: uppercase;
+      letter-spacing: 1px;
+      font-weight: 600;
+    }
+
+    .item-title {
+      font-size: 1.5rem;
+      margin-top: 4px;
+      font-weight: 700;
+    }
+
+    /* Price and Timer Display */
+    .hero-metrics {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+      margin-bottom: 24px;
+      background: rgba(13, 17, 23, 0.6);
+      padding: 16px;
+      border-radius: 8px;
+      border: 1px solid var(--border);
+    }
+
+    .metric-box {
+      display: flex;
+      flex-direction: column;
+    }
+
+    .metric-label {
+      font-size: 0.8rem;
+      color: var(--text-muted);
+      text-transform: uppercase;
+      margin-bottom: 4px;
+    }
+
+    .metric-value {
+      font-size: 2rem;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      transition: color 0.3s ease;
+    }
+
+    .price-value {
+      color: #3fb950;
+    }
+
+    .price-bump {
+      animation: priceFlash 0.6s ease;
+    }
+
+    @keyframes priceFlash {
+      0% { color: #f0883e; transform: scale(1.08); }
+      100% { color: #3fb950; transform: scale(1); }
+    }
+
+    .timer-normal {
+      color: var(--text-main);
+    }
+
+    .timer-warning {
+      color: var(--danger);
+      animation: pulse 1s infinite;
+    }
+
+    .highest-bidder-badge {
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-top: 4px;
+    }
+
+    .highest-bidder-badge span {
+      color: var(--text-main);
+      font-weight: 600;
+    }
+
+    /* Bid Action Box */
+    .bid-action-box {
+      margin-top: 10px;
+    }
+
+    .form-group {
+      margin-bottom: 14px;
+    }
+
+    .form-label {
+      display: block;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      margin-bottom: 6px;
+    }
+
+    .input-field {
+      width: 100%;
+      padding: 10px 14px;
+      background-color: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-main);
+      font-size: 1rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .input-field:focus {
+      border-color: var(--info);
+    }
+
+    .quick-bids {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 16px;
+      flex-wrap: wrap;
+    }
+
+    .quick-btn {
+      background-color: rgba(48, 54, 61, 0.4);
+      border: 1px solid var(--border);
+      color: var(--info);
+      padding: 6px 12px;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      font-weight: 600;
+      transition: all 0.2s;
+    }
+
+    .quick-btn:hover {
+      background-color: var(--border);
+      color: #fff;
+    }
+
+    .bid-submit-btn {
+      width: 100%;
+      background-color: var(--accent);
+      color: #fff;
+      border: none;
+      padding: 14px;
+      border-radius: 8px;
+      font-size: 1.1rem;
+      font-weight: 700;
+      cursor: pointer;
+      transition: background-color 0.2s, transform 0.1s;
+    }
+
+    .bid-submit-btn:hover {
+      background-color: var(--accent-hover);
+    }
+
+    .bid-submit-btn:active {
+      transform: scale(0.99);
+    }
+
+    .bid-submit-btn:disabled {
+      background-color: var(--border);
+      color: var(--text-muted);
+      cursor: not-allowed;
+    }
+
+    /* Status & Alerts */
+    .alert-msg {
+      margin-top: 12px;
+      padding: 10px 14px;
+      border-radius: 6px;
+      font-size: 0.9rem;
+      display: none;
+    }
+
+    .alert-error {
+      display: block;
+      background: rgba(248, 81, 73, 0.15);
+      border: 1px solid rgba(248, 81, 73, 0.4);
+      color: #ff7b72;
+    }
+
+    .alert-success {
+      display: block;
+      background: rgba(63, 185, 80, 0.15);
+      border: 1px solid rgba(63, 185, 80, 0.4);
+      color: #3fb950;
+    }
+
+    /* History Feed */
+    .history-card {
+      display: flex;
+      flex-direction: column;
+      max-height: 520px;
+    }
+
+    .history-card h2 {
+      font-size: 1.1rem;
+      margin-bottom: 16px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .feed-list {
+      list-style: none;
+      overflow-y: auto;
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      padding-right: 4px;
+    }
+
+    .feed-item {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      padding: 10px 12px;
+      background: rgba(13, 17, 23, 0.7);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      font-size: 0.88rem;
+      animation: fadeIn 0.3s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-6px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+
+    .feed-user {
+      font-weight: 600;
+      color: var(--text-main);
+    }
+
+    .feed-time {
+      font-size: 0.75rem;
+      color: var(--text-muted);
+    }
+
+    .feed-amount {
+      font-weight: 700;
+      color: #3fb950;
+    }
+
+    /* Winner Banner */
+    .winner-card {
+      display: none;
+      background: linear-gradient(135deg, rgba(210, 153, 34, 0.15), rgba(35, 134, 54, 0.15));
+      border: 2px solid var(--gold);
+      border-radius: 12px;
+      padding: 24px;
+      text-align: center;
+    }
+
+    .winner-card h2 {
+      font-size: 1.8rem;
+      color: var(--gold);
+      margin-bottom: 8px;
+    }
+
+    .winner-card p {
+      font-size: 1.1rem;
+      color: var(--text-main);
+    }
+
+    .winner-highlight {
+      font-weight: 800;
+      color: #fff;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <header>
+      <div class="brand">
+        <h1>🏏 Live Cricket Auction</h1>
+        <span class="brand-badge">SINGLE WRITER ENGINE</span>
+      </div>
+      <div class="header-stats">
+        <span class="live-indicator"><span class="live-dot"></span> <span id="statusText">CONNECTING...</span></span>
+        <span>👥 Watchers: <b id="watcherCount">1</b></span>
+      </div>
+    </header>
+
+    <!-- Anti-sniping notification -->
+    <div id="snipingAlert" class="sniping-alert">
+      ⚡ <b>ANTI-SNIPING TRIGGERED!</b> A bid arrived in the last 30 seconds. Timer extended by 30 seconds!
+    </div>
+
+    <!-- Winner Banner -->
+    <div id="winnerCard" class="winner-card">
+      <h2>🏆 AUCTION CONCLUDED</h2>
+      <p id="winnerMessage">Final Winner: <span class="winner-highlight">-</span></p>
+    </div>
+
+    <div class="main-grid">
+      <!-- Left Column: Current Auction & Bid Form -->
+      <div class="card">
+        <div class="item-header">
+          <span class="item-tag" id="auctionTag">LOT #1</span>
+          <h2 class="item-title" id="itemTitle">Loading item...</h2>
+        </div>
+
+        <div class="hero-metrics">
+          <div class="metric-box">
+            <span class="metric-label">Current Price</span>
+            <span class="metric-value price-value" id="currentPriceDisplay">₹0</span>
+            <div class="highest-bidder-badge">
+              Highest: <span id="highestBidderDisplay">None</span>
+            </div>
+          </div>
+          <div class="metric-box">
+            <span class="metric-label">Time Remaining</span>
+            <span class="metric-value timer-normal" id="timerDisplay">--:--</span>
+            <div class="highest-bidder-badge" id="antiSnipingBadge">
+              Rule: +30s if bid in last 30s
+            </div>
+          </div>
+        </div>
+
+        <div class="bid-action-box">
+          <form id="bidForm">
+            <div class="form-group">
+              <label class="form-label" for="bidderInput">Your Name / Handle</label>
+              <input type="text" id="bidderInput" class="input-field" placeholder="e.g. Ravi or Priya" required />
+            </div>
+
+            <div class="form-group">
+              <label class="form-label" for="bidAmountInput">Bid Amount (₹ INR)</label>
+              <input type="number" id="bidAmountInput" class="input-field" step="100" min="1" required />
+            </div>
+
+            <div class="quick-bids">
+              <button type="button" class="quick-btn" onclick="addQuickBid(100)">+₹100</button>
+              <button type="button" class="quick-btn" onclick="addQuickBid(500)">+₹500</button>
+              <button type="button" class="quick-btn" onclick="addQuickBid(1000)">+₹1,000</button>
+              <button type="button" class="quick-btn" onclick="addQuickBid(5000)">+₹5,000</button>
+            </div>
+
+            <button type="submit" id="submitBidBtn" class="bid-submit-btn">Place Live Bid</button>
+          </form>
+
+          <div id="feedbackAlert" class="alert-msg"></div>
+        </div>
+      </div>
+
+      <!-- Right Column: Live Bid Activity Feed -->
+      <div class="card history-card">
+        <h2>
+          <span>Live Bids</span>
+          <span style="font-size: 0.8rem; color: var(--text-muted);" id="bidCount">0 bids</span>
+        </h2>
+        <ul class="feed-list" id="feedList">
+          <li style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px;">
+            Awaiting first bid...
+          </li>
+        </ul>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    const AUCTION_ID = 'a1';
+    let currentPrice = 0;
+    let endTime = 0;
+    let serverTimeSkew = 0; // serverTime - localTime
+    let isClosed = false;
+    let eventSource = null;
+
+    // Elements
+    const itemTitleEl = document.getElementById('itemTitle');
+    const currentPriceEl = document.getElementById('currentPriceDisplay');
+    const highestBidderEl = document.getElementById('highestBidderDisplay');
+    const timerDisplayEl = document.getElementById('timerDisplay');
+    const antiSnipingBadgeEl = document.getElementById('antiSnipingBadge');
+    const statusTextEl = document.getElementById('statusText');
+    const watcherCountEl = document.getElementById('watcherCount');
+    const feedListEl = document.getElementById('feedList');
+    const bidCountEl = document.getElementById('bidCount');
+    const bidderInput = document.getElementById('bidderInput');
+    const bidAmountInput = document.getElementById('bidAmountInput');
+    const submitBidBtn = document.getElementById('submitBidBtn');
+    const feedbackAlertEl = document.getElementById('feedbackAlert');
+    const snipingAlertEl = document.getElementById('snipingAlert');
+    const winnerCardEl = document.getElementById('winnerCard');
+    const winnerMessageEl = document.getElementById('winnerMessage');
+
+    // Restore name
+    bidderInput.value = localStorage.getItem('bidder_name') || 'Ravi';
+
+    // Format currency
+    function formatINR(amount) {
+      return '₹' + Number(amount).toLocaleString('en-IN');
+    }
+
+    // Set recommended next bid
+    function suggestNextBid(price) {
+      bidAmountInput.value = price + 500;
+    }
+
+    function addQuickBid(increment) {
+      const val = Number(bidAmountInput.value) || currentPrice;
+      bidAmountInput.value = Math.max(val + increment, currentPrice + increment);
+    }
+
+    // Show feedback
+    function showFeedback(msg, isSuccess = false) {
+      feedbackAlertEl.textContent = msg;
+      feedbackAlertEl.className = 'alert-msg ' + (isSuccess ? 'alert-success' : 'alert-error');
+      setTimeout(() => {
+        feedbackAlertEl.style.display = 'none';
+      }, 4000);
+    }
+
+    // Flash price bump
+    function flashPrice() {
+      currentPriceEl.classList.remove('price-bump');
+      void currentPriceEl.offsetWidth; // trigger reflow
+      currentPriceEl.classList.add('price-bump');
+    }
+
+    // Add bid to history list
+    function addBidToHistory(bid, prepend = true) {
+      const item = document.createElement('li');
+      item.className = 'feed-item';
+      const timeStr = new Date(bid.time).toLocaleTimeString();
+      item.innerHTML = `
+        <div>
+          <span class="feed-user">#${bid.seq} ${bid.bidder}</span>
+          <div class="feed-time">${timeStr}</div>
+        </div>
+        <div class="feed-amount">${formatINR(bid.amount)}</div>
+      `;
+
+      if (feedListEl.children.length === 1 && feedListEl.children[0].textContent.includes('Awaiting')) {
+        feedListEl.innerHTML = '';
+      }
+
+      if (prepend) {
+        feedListEl.insertBefore(item, feedListEl.firstChild);
+      } else {
+        feedListEl.appendChild(item);
+      }
+    }
+
+    // Update UI from auction state
+    function updateState(data) {
+      if (data.serverTime) {
+        serverTimeSkew = data.serverTime - Date.now();
+      }
+
+      if (data.item) itemTitleEl.textContent = data.item;
+      if (data.currentPrice !== undefined) {
+        const oldPrice = currentPrice;
+        currentPrice = data.currentPrice;
+        currentPriceEl.textContent = formatINR(currentPrice);
+        if (currentPrice > oldPrice && oldPrice > 0) {
+          flashPrice();
+        }
+        if (!bidAmountInput.value || Number(bidAmountInput.value) <= currentPrice) {
+          suggestNextBid(currentPrice);
+        }
+      }
+
+      if (data.highestBidder !== undefined) {
+        highestBidderEl.textContent = data.highestBidder || 'None';
+      }
+
+      if (data.endTime) {
+        endTime = data.endTime;
+      }
+
+      if (data.bids && Array.isArray(data.bids)) {
+        feedListEl.innerHTML = '';
+        bidCountEl.textContent = `${data.bids.length} bids`;
+        if (data.bids.length === 0) {
+          feedListEl.innerHTML = '<li style="color: var(--text-muted); font-size: 0.85rem; text-align: center; padding: 20px;">Awaiting first bid...</li>';
+        } else {
+          // Newest first
+          const reversed = [...data.bids].reverse();
+          reversed.forEach((b) => addBidToHistory(b, false));
+        }
+      }
+
+      if (data.status === 'closed') {
+        markClosed(data.winner, data.currentPrice);
+      }
+    }
+
+    function markClosed(winner, finalPrice) {
+      isClosed = true;
+      submitBidBtn.disabled = true;
+      submitBidBtn.textContent = 'Auction Closed';
+      timerDisplayEl.textContent = '00:00';
+      timerDisplayEl.className = 'metric-value timer-normal';
+      winnerCardEl.style.display = 'block';
+      winnerMessageEl.innerHTML = `Winner: <span class="winner-highlight">${winner || 'No Bids'}</span> at <b>${formatINR(finalPrice || currentPrice)}</b>`;
+    }
+
+    // Countdown loop
+    setInterval(() => {
+      if (isClosed || !endTime) return;
+
+      const now = Date.now() + serverTimeSkew;
+      const diffMs = Math.max(0, endTime - now);
+      const totalSec = Math.floor(diffMs / 1000);
+      const min = Math.floor(totalSec / 60);
+      const sec = totalSec % 60;
+      const formatted = `${String(min).padStart(2, '0')}:${String(sec).padStart(2, '0')}`;
+
+      timerDisplayEl.textContent = formatted;
+
+      // In last 30s: anti-sniping zone
+      if (totalSec <= 30 && totalSec > 0) {
+        timerDisplayEl.className = 'metric-value timer-warning';
+        antiSnipingBadgeEl.innerHTML = '⚠️ <b style="color: #f85149;">SNIPING ZONE (&lt;30s)</b>: bids add 30s!';
+      } else {
+        timerDisplayEl.className = 'metric-value timer-normal';
+        antiSnipingBadgeEl.textContent = 'Rule: +30s if bid in last 30s';
+      }
+
+      if (totalSec === 0 && !isClosed) {
+        timerDisplayEl.textContent = '00:00';
+      }
+    }, 200);
+
+    // Setup Server-Sent Events (SSE)
+    function connectSSE() {
+      if (eventSource) eventSource.close();
+
+      eventSource = new EventSource(`/auctions/${AUCTION_ID}/stream`);
+
+      eventSource.addEventListener('open', () => {
+        statusTextEl.textContent = 'LIVE SSE CONNECTED';
+        statusTextEl.parentElement.style.color = '#3fb950';
+      });
+
+      eventSource.addEventListener('INIT_STATE', (e) => {
+        const data = JSON.parse(e.data);
+        updateState(data);
+      });
+
+      eventSource.addEventListener('BID_ACCEPTED', (e) => {
+        const data = JSON.parse(e.data);
+        currentPrice = data.currentPrice;
+        currentPriceEl.textContent = formatINR(currentPrice);
+        highestBidderEl.textContent = data.highestBidder;
+        endTime = data.endTime;
+        flashPrice();
+        addBidToHistory(data.bid, true);
+        suggestNextBid(currentPrice);
+      });
+
+      eventSource.addEventListener('ANTI_SNIPING_EXTENDED', (e) => {
+        const data = JSON.parse(e.data);
+        endTime = data.newEndTime;
+        snipingAlertEl.style.display = 'block';
+        setTimeout(() => {
+          snipingAlertEl.style.display = 'none';
+        }, 5000);
+      });
+
+      eventSource.addEventListener('AUCTION_CLOSED', (e) => {
+        const data = JSON.parse(e.data);
+        markClosed(data.winner, data.finalPrice);
+      });
+
+      eventSource.addEventListener('WATCHER_COUNT', (e) => {
+        const data = JSON.parse(e.data);
+        watcherCountEl.textContent = data.count;
+      });
+
+      eventSource.onerror = () => {
+        statusTextEl.textContent = 'RECONNECTING...';
+        statusTextEl.parentElement.style.color = '#f0883e';
+      };
+    }
+
+    // Bid submission handler
+    document.getElementById('bidForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      if (isClosed) return;
+
+      const bidder = bidderInput.value.trim();
+      const amount = Number(bidAmountInput.value);
+
+      if (!bidder) {
+        showFeedback('Please enter your name');
+        return;
+      }
+
+      if (amount <= currentPrice) {
+        showFeedback(`Bid must be strictly higher than current price of ${formatINR(currentPrice)}`);
+        return;
+      }
+
+      localStorage.setItem('bidder_name', bidder);
+      submitBidBtn.disabled = true;
+
+      try {
+        const res = await fetch(`/auctions/${AUCTION_ID}/bids`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ bidder, amount })
+        });
+        const data = await res.json();
+
+        if (res.ok && data.success) {
+          showFeedback(`Bid of ${formatINR(amount)} accepted!`, true);
+          suggestNextBid(amount);
+        } else {
+          showFeedback(data.reason || 'Bid rejected by server');
+        }
+      } catch (err) {
+        showFeedback('Network error submitting bid');
+      } finally {
+        submitBidBtn.disabled = isClosed;
+      }
+    });
+
+    // Initial connection
+    connectSSE();
+  </script>
+</body>
+</html>
