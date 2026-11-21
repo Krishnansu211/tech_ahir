@@ -10,13 +10,53 @@ const PORT = process.env.PORT || 3000;
 app.use(express.json());
 app.use(express.static(path.join(__dirname, '..', 'public')));
 
+const { loginUser, getUserFromToken, requireRole } = require('./auth');
+
+/**
+ * POST /api/auth/login
+ * Body: { username, role: 'bidder' | 'writer' }
+ */
+app.post('/api/auth/login', (req, res) => {
+  try {
+    const { username, role } = req.body;
+    const session = loginUser({ username, role });
+    res.json({ success: true, ...session });
+  } catch (err) {
+    res.status(400).json({ success: false, error: err.message });
+  }
+});
+
+/**
+ * GET /api/auth/me
+ * Returns current authenticated user and role
+ */
+app.get('/api/auth/me', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : req.query.token;
+  const user = getUserFromToken(token);
+  if (!user) return res.status(401).json({ error: 'Not authenticated' });
+  res.json({ user });
+});
+
 /**
  * POST /auctions
- * Creates a new auction
+ * Creates a new auction (Requires 'writer' / Auctioneer role)
  * Body: { id, item, startPrice, duration } (duration in seconds)
  */
 app.post('/auctions', (req, res) => {
   try {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : req.query.token;
+    const user = getUserFromToken(token);
+
+    // If token provided, verify role
+    if (user && user.role !== 'writer') {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Only users with the Writer/Auctioneer role can create auctions'
+      });
+    }
+
     const { id, item, startPrice, duration } = req.body;
     const auctionId = id || `a${Date.now()}`;
     const durationSec = duration || 120; // default 120 seconds
@@ -91,6 +131,34 @@ app.post('/auctions/:id/reset', (req, res) => {
 });
 
 /**
+ * POST /auctions/:id/close
+ * Forces an auction to close immediately (Requires 'writer' role)
+ */
+app.post('/auctions/:id/close', (req, res) => {
+  const authHeader = req.headers['authorization'];
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : req.query.token;
+  const user = getUserFromToken(token);
+
+  if (user && user.role !== 'writer') {
+    return res.status(403).json({ error: 'Only writers/auctioneers can close an auction manually' });
+  }
+
+  const auction = store.get(req.params.id);
+  if (!auction) return res.status(404).json({ error: 'Auction not found' });
+
+  closeAuction(auction);
+  sseManager.broadcast(auction.id, 'AUCTION_CLOSED', {
+    id: auction.id,
+    status: 'closed',
+    winner: auction.winner,
+    finalPrice: auction.currentPrice,
+    endTime: auction.endTime
+  });
+
+  return res.json({ success: true, auction });
+});
+
+/**
  * GET /auctions/:id
  * Fetches current state of an auction including authoritative server time
  */
@@ -120,6 +188,19 @@ app.post('/auctions/:id/bids', async (req, res) => {
   const auctionId = req.params.id;
   const { bidder, amount } = req.body;
 
+  const authHeader = req.headers['authorization'];
+  const token = authHeader ? authHeader.replace(/^Bearer\s+/i, '') : req.query.token;
+  const user = getUserFromToken(token);
+
+  if (user && user.role !== 'bidder') {
+    return res.status(403).json({
+      success: false,
+      reason: 'Role restriction: Writers/Auctioneers are not allowed to place bids. Only Bidders can bid!'
+    });
+  }
+
+  const effectiveBidder = (user ? user.name : bidder) || 'Anonymous';
+
   if (!store.has(auctionId)) {
     return res.status(404).json({ error: 'Auction not found' });
   }
@@ -128,7 +209,7 @@ app.post('/auctions/:id/bids', async (req, res) => {
   const result = await store.executeAtomic(auctionId, () => {
     const auction = store.get(auctionId);
     const now = Date.now();
-    const bidResult = placeBid(auction, { bidder, amount, now });
+    const bidResult = placeBid(auction, { bidder: effectiveBidder, amount, now });
     return { bidResult, auction, now };
   });
 

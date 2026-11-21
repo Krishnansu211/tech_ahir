@@ -420,11 +420,47 @@
         <span class="brand-badge">SINGLE WRITER ENGINE</span>
       </div>
       <div class="header-stats">
-        <button id="resetBtn" onclick="resetDemoAuction()" style="background: rgba(88, 166, 255, 0.15); border: 1px solid rgba(88, 166, 255, 0.4); color: var(--info); padding: 5px 12px; border-radius: 6px; font-size: 0.8rem; font-weight: 600; cursor: pointer;">🔄 Restart Auction (3m)</button>
         <span class="live-indicator"><span class="live-dot"></span> <span id="statusText">CONNECTING...</span></span>
         <span>👥 Watchers: <b id="watcherCount">1</b></span>
       </div>
     </header>
+
+    <!-- Role Authentication & Switcher Bar -->
+    <div class="card" style="padding: 14px 18px; background: rgba(22, 27, 34, 0.9); border: 1px solid var(--border);">
+      <div id="authLoggedOut" style="display: flex; justify-content: space-between; align-items: center; flex-wrap: wrap; gap: 10px;">
+        <span style="font-size: 0.88rem; color: var(--text-muted);">
+          <b>🔑 Select Role to Test:</b>
+        </span>
+        <div style="display: flex; gap: 8px; flex-wrap: wrap;">
+          <button class="quick-btn" onclick="quickLogin('ravi', 'bidder')" style="border-color: #3fb950; color: #3fb950;">👤 Login as Bidder (Ravi)</button>
+          <button class="quick-btn" onclick="quickLogin('priya', 'bidder')" style="border-color: #3fb950; color: #3fb950;">👤 Login as Bidder (Priya)</button>
+          <button class="quick-btn" onclick="quickLogin('admin', 'writer')" style="border-color: #d29922; color: #d29922;">👑 Login as Writer (Admin)</button>
+        </div>
+      </div>
+
+      <div id="authLoggedIn" style="display: none; justify-content: space-between; align-items: center; width: 100%;">
+        <div style="display: flex; align-items: center; gap: 12px;">
+          <span>Active User: <strong id="authUserName" style="color: #fff;">-</strong></span>
+          <span id="authUserRoleBadge" class="brand-badge" style="text-transform: uppercase;">BIDDER</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <button class="quick-btn" onclick="switchRole()" style="color: var(--info);">🔄 Switch Role</button>
+          <button class="quick-btn" onclick="logout()" style="color: #f85149; border-color: rgba(248, 81, 73, 0.4);">🚪 Log Out</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Writer / Auctioneer Management Console -->
+    <div id="writerPanel" class="card" style="display: none; border-color: #d29922; background: rgba(210, 153, 34, 0.08); padding: 16px;">
+      <h3 style="color: #d29922; margin-bottom: 10px; font-size: 0.95rem; display: flex; align-items: center; justify-content: space-between;">
+        <span>👑 <b>Writer / Auctioneer Control Panel</b> (Exclusive to Writer Role)</span>
+        <span style="font-size: 0.75rem; color: #d29922;">Can create, reset & close auctions</span>
+      </h3>
+      <div style="display: flex; gap: 10px; flex-wrap: wrap;">
+        <button class="quick-btn" onclick="resetDemoAuction()" style="color: #58a6ff; border-color: #58a6ff;">🔄 Reset Lot with 3m Timer</button>
+        <button class="quick-btn" onclick="forceCloseAuction()" style="color: #f85149; border-color: #f85149;">🛑 Force Close Auction</button>
+      </div>
+    </div>
 
     <!-- Anti-sniping notification -->
     <div id="snipingAlert" class="sniping-alert">
@@ -742,9 +778,12 @@
       submitBidBtn.disabled = true;
 
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
         const res = await fetch(`/auctions/${AUCTION_ID}/bids`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify({ bidder, amount })
         });
         const data = await res.json();
@@ -753,35 +792,152 @@
           showFeedback(`Bid of ${formatINR(amount)} accepted!`, true);
           suggestNextBid(amount);
         } else {
-          showFeedback(data.reason || 'Bid rejected by server');
+          showFeedback(data.reason || data.message || 'Bid rejected by server');
         }
       } catch (err) {
         showFeedback('Network error submitting bid');
       } finally {
-        submitBidBtn.disabled = isClosed;
+        submitBidBtn.disabled = isClosed || (currentUser && currentUser.role === 'writer');
       }
     });
 
-    // Reset demo auction function
+    // Reset demo auction function (Writer permission)
     async function resetDemoAuction() {
       try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
         const res = await fetch(`/auctions/${AUCTION_ID}/reset`, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
+          headers: headers,
           body: JSON.stringify({ duration: 180, startPrice: 5000 })
         });
         const data = await res.json();
         if (data.success) {
           isClosed = false;
-          submitBidBtn.disabled = false;
-          submitBidBtn.textContent = 'Place Live Bid';
+          submitBidBtn.disabled = (currentUser && currentUser.role === 'writer');
+          submitBidBtn.textContent = (currentUser && currentUser.role === 'writer') ? 'Writers Cannot Bid' : 'Place Live Bid';
           winnerCardEl.style.display = 'none';
           updateState(data.auction);
           showFeedback('Demo auction restarted with fresh 3-minute timer!', true);
+        } else {
+          showFeedback(data.error || data.message || 'Reset failed');
         }
       } catch (err) {
         showFeedback('Failed to restart auction');
       }
+    }
+
+    // Force close auction function (Writer exclusive)
+    async function forceCloseAuction() {
+      try {
+        const headers = { 'Content-Type': 'application/json' };
+        if (authToken) headers['Authorization'] = `Bearer ${authToken}`;
+
+        const res = await fetch(`/auctions/${AUCTION_ID}/close`, {
+          method: 'POST',
+          headers: headers
+        });
+        const data = await res.json();
+        if (data.success) {
+          showFeedback('Auction forcefully closed by Writer!', true);
+        } else {
+          showFeedback(data.error || data.message || 'Failed to close');
+        }
+      } catch (err) {
+        showFeedback('Network error closing auction');
+      }
+    }
+
+    // Authentication State & Handlers
+    let currentUser = JSON.parse(localStorage.getItem('auth_user') || 'null');
+    let authToken = localStorage.getItem('auth_token') || null;
+
+    const authLoggedOutEl = document.getElementById('authLoggedOut');
+    const authLoggedInEl = document.getElementById('authLoggedIn');
+    const authUserNameEl = document.getElementById('authUserName');
+    const authUserRoleBadgeEl = document.getElementById('authUserRoleBadge');
+    const writerPanelEl = document.getElementById('writerPanel');
+
+    function updateAuthUI() {
+      if (currentUser && authToken) {
+        authLoggedOutEl.style.display = 'none';
+        authLoggedInEl.style.display = 'flex';
+        authUserNameEl.textContent = currentUser.name || currentUser.username;
+        authUserRoleBadgeEl.textContent = currentUser.role.toUpperCase();
+
+        if (currentUser.role === 'writer') {
+          authUserRoleBadgeEl.style.background = 'rgba(210, 153, 34, 0.2)';
+          authUserRoleBadgeEl.style.color = '#d29922';
+          authUserRoleBadgeEl.style.borderColor = '#d29922';
+          writerPanelEl.style.display = 'block';
+          submitBidBtn.disabled = true;
+          submitBidBtn.textContent = 'Writers Cannot Bid';
+        } else {
+          authUserRoleBadgeEl.style.background = 'rgba(35, 134, 54, 0.2)';
+          authUserRoleBadgeEl.style.color = '#3fb950';
+          authUserRoleBadgeEl.style.borderColor = 'rgba(63, 185, 80, 0.4)';
+          writerPanelEl.style.display = 'none';
+          if (!isClosed) {
+            submitBidBtn.disabled = false;
+            submitBidBtn.textContent = 'Place Live Bid';
+          }
+          bidderInput.value = currentUser.name || currentUser.username;
+        }
+      } else {
+        authLoggedOutEl.style.display = 'flex';
+        authLoggedInEl.style.display = 'none';
+        writerPanelEl.style.display = 'none';
+        if (!isClosed) {
+          submitBidBtn.disabled = false;
+          submitBidBtn.textContent = 'Place Live Bid';
+        }
+      }
+    }
+
+    async function quickLogin(username, role) {
+      try {
+        const res = await fetch('/api/auth/login', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username, role })
+        });
+        const data = await res.json();
+        if (data.success) {
+          currentUser = data.user;
+          authToken = data.token;
+          localStorage.setItem('auth_user', JSON.stringify(currentUser));
+          localStorage.setItem('auth_token', authToken);
+          updateAuthUI();
+          showFeedback(`Logged in as ${currentUser.name} (${currentUser.role.toUpperCase()})`, true);
+        }
+      } catch (err) {
+        showFeedback('Login failed');
+      }
+    }
+
+    function logout() {
+      currentUser = null;
+      authToken = null;
+      localStorage.removeItem('auth_user');
+      localStorage.removeItem('auth_token');
+      updateAuthUI();
+      showFeedback('Logged out successfully', true);
+    }
+
+    function switchRole() {
+      if (currentUser && currentUser.role === 'writer') {
+        quickLogin('ravi', 'bidder');
+      } else {
+        quickLogin('admin', 'writer');
+      }
+    }
+
+    // Default to Bidder if first time
+    if (!currentUser) {
+      quickLogin('ravi', 'bidder');
+    } else {
+      updateAuthUI();
     }
 
     // Initial connection
